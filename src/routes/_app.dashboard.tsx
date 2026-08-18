@@ -94,7 +94,10 @@ function DashboardPage() {
             ),
           );
         });
-        return { day: item.day, horas: Number((milliseconds / 3_600_000).toFixed(1)) };
+        return {
+          day: item.day,
+          horas: Number((milliseconds / 3_600_000).toFixed(1)),
+        };
       }),
     [records, weeklyAttendance],
   );

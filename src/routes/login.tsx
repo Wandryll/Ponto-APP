@@ -104,7 +104,10 @@ function LoginPage() {
                   className="pl-9"
                   {...register("email", {
                     required: "Informe o e-mail",
-                    pattern: { value: /\S+@\S+\.\S+/, message: "E-mail inválido" },
+                    pattern: {
+                      value: /\S+@\S+\.\S+/,
+                      message: "E-mail inválido",
+                    },
                   })}
                 />
               </div>

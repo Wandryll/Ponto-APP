@@ -60,7 +60,10 @@ function ProfilePage() {
       const avatarPath = `${user.id}/avatar.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("avatares")
-        .upload(avatarPath, avatarFile, { contentType: "image/jpeg", upsert: true });
+        .upload(avatarPath, avatarFile, {
+          contentType: "image/jpeg",
+          upsert: true,
+        });
       if (uploadError) {
         toast.error("Não foi possível atualizar a foto.");
         return;
@@ -80,7 +83,9 @@ function ProfilePage() {
     setAvatarFile(null);
     updateUser({ name: safeName, avatar: avatarUrl });
     if (data.password) {
-      const { error: passwordError } = await supabase.auth.updateUser({ password: data.password });
+      const { error: passwordError } = await supabase.auth.updateUser({
+        password: data.password,
+      });
       if (passwordError) {
         toast.warning("O perfil foi salvo, mas não foi possível alterar a senha.");
         return;

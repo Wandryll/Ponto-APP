@@ -4,12 +4,32 @@ import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
 
 const allItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "employee"] },
-  { to: "/checkpoint", label: "Check-in / Check-out", icon: Clock, roles: ["admin", "employee"] },
-  { to: "/history", label: "Histórico", icon: History, roles: ["admin", "employee"] },
+  {
+    to: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    roles: ["admin", "employee"],
+  },
+  {
+    to: "/checkpoint",
+    label: "Check-in / Check-out",
+    icon: Clock,
+    roles: ["admin", "employee"],
+  },
+  {
+    to: "/history",
+    label: "Histórico",
+    icon: History,
+    roles: ["admin", "employee"],
+  },
   { to: "/reports", label: "Relatórios", icon: BarChart3, roles: ["admin"] },
   { to: "/team", label: "Equipe", icon: Users, roles: ["admin"] },
-  { to: "/profile", label: "Perfil", icon: Settings, roles: ["admin", "employee"] },
+  {
+    to: "/profile",
+    label: "Perfil",
+    icon: Settings,
+    roles: ["admin", "employee"],
+  },
 ];
 
 export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {

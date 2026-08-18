@@ -194,7 +194,13 @@ function TeamPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Nome completo</Label>
-              <Input {...register("nome", { required: true, minLength: 2, maxLength: 120 })} />
+              <Input
+                {...register("nome", {
+                  required: true,
+                  minLength: 2,
+                  maxLength: 120,
+                })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>E-mail de acesso</Label>
@@ -208,7 +214,10 @@ function TeamPage() {
                   type="password"
                   autoComplete="new-password"
                   className="pl-9"
-                  {...register("senha_inicial", { required: true, minLength: 8 })}
+                  {...register("senha_inicial", {
+                    required: true,
+                    minLength: 8,
+                  })}
                 />
               </div>
             </div>
