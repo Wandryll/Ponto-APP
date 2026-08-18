@@ -1,0 +1,8 @@
+dist
+.output
+node_modules
+package-lock.json
+src/routeTree.gen.ts
+supabase/migrations
+.env.example
+.nvmrc
