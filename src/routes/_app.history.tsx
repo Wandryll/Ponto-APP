@@ -30,7 +30,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 
 export const Route = createFileRoute("/_app/history")({
-  head: () => ({ meta: [{ title: "Histórico — ITM" }] }),
+  head: () => ({ meta: [{ title: "Histórico — Ponto DCT" }] }),
   component: HistoryPage,
 });
 

@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useRecords } from "@/contexts/records-context";
 
 export const Route = createFileRoute("/_app/checkpoint")({
-  head: () => ({ meta: [{ title: "Check-in / Check-out — PontoCorp" }] }),
+  head: () => ({ meta: [{ title: "Check-in / Check-out — Ponto DCT" }] }),
   component: CheckpointPage,
 });
 

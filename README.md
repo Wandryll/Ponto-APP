@@ -1,7 +1,7 @@
-# Ponto App
+# Ponto DCT
 
-Aplicação web de controle de ponto para equipes, com autenticação, perfis administrativos,
-geolocalização, captura de foto e relatórios de jornada.
+Aplicação web do Departamento de Ciências e Tecnologia de Manacapuru para controle de ponto, com
+autenticação, perfis administrativos, geolocalização, captura de foto e relatórios de jornada.
 
 ## Funcionalidades
 
@@ -11,7 +11,7 @@ geolocalização, captura de foto e relatórios de jornada.
 - histórico individual e visão administrativa;
 - cadastro de funcionários por Edge Function protegida;
 - relatórios de presença e horas trabalhadas;
-- perfis ativos/inativos e controle de acesso por função;
+- validação de perfis ativos e controle de acesso por função;
 - políticas RLS e buckets com permissões por usuário.
 
 ## Tecnologias
@@ -78,6 +78,8 @@ auditoria de dependências em pushes para `main` e pull requests.
 
 - faltas exigem uma escala de trabalho configurável, ainda não implementada;
 - exportação em PDF e Excel ainda não está disponível;
+- ativação, desativação e edição de funcionários ainda não estão disponíveis na interface;
+- não há geocerca para limitar registros ao local de trabalho;
 - o sistema requer conexão com a internet;
 - localização fornecida pelo navegador não elimina fraude em dispositivos comprometidos;
 - uso de fotos e geolocalização exige governança e avaliação de LGPD pela organização.

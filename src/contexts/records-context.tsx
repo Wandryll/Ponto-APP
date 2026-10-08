@@ -21,9 +21,7 @@ interface RecordRow {
   longitude: number;
   foto_path: string | null;
   colaboradores:
-    | { nome: string; avatar: string | null }
-    | Array<{ nome: string; avatar: string | null }>
-    | null;
+    { nome: string; avatar: string | null } | Array<{ nome: string; avatar: string | null }> | null;
 }
 
 export function RecordsProvider({ children }: { children: ReactNode }) {

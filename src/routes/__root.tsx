@@ -6,6 +6,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import type { ErrorComponentProps } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import appCss from "../styles.css?url";
@@ -33,7 +34,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   return (
@@ -60,10 +61,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Ponto — Gestão de Equipe e Controle de Ponto" },
+      { title: "Ponto DCT — Gestão de Equipe e Controle de Ponto" },
       {
         name: "description",
-        content: "Sistema corporativo de controle de ponto com check-in por geolocalização e foto.",
+        content: "Sistema institucional de controle de ponto com geolocalização e foto.",
       },
     ],
     links: [{ rel: "stylesheet", href: appCss }],

@@ -32,7 +32,7 @@ export function AppHeader() {
   });
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border bg-card/80 backdrop-blur px-4 sm:px-6">
+    <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border bg-card/90 px-4 shadow-[0_1px_0_rgb(16_43_73/0.03)] backdrop-blur sm:px-6">
       <div className="flex items-center gap-3 min-w-0">
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
@@ -60,7 +60,7 @@ export function AppHeader() {
               {user.position}
             </span>
           </div>
-          <Avatar className="h-9 w-9 ring-2 ring-primary/20">
+          <Avatar className="h-9 w-9 ring-2 ring-primary/15 shadow-sm">
             <AvatarImage src={user.avatar} alt={user.name} />
             <AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>

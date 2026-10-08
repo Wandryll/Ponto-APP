@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, Clock, History, BarChart3, Users, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
+import { BrandLogos } from "./brand-logos";
 
 const allItems = [
   {
@@ -40,15 +41,11 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <aside className="flex h-full w-64 flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center gap-2 px-6 py-5 border-b border-sidebar-border">
-        <img
-          src="/logo_itm.png"
-          alt="Logo ITM"
-          className="h-8 w-auto object-contain bg-white rounded p-1 shrink-0"
-        />
-        <div className="leading-tight">
-          <div className="font-bold text-sm">ITM</div>
-          <div className="text-[11px] text-sidebar-foreground/60">Gestão de Equipe</div>
+      <div className="border-b border-sidebar-border px-4 py-4">
+        <BrandLogos compact />
+        <div className="mt-3 border-t border-sidebar-border/80 pt-3 leading-tight">
+          <div className="text-sm font-bold tracking-wide">Ponto DCT</div>
+          <div className="mt-0.5 text-[11px] text-sidebar-foreground/60">Gestão de equipe</div>
         </div>
       </div>
 
@@ -64,7 +61,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-soft ring-1 ring-white/10"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
             >

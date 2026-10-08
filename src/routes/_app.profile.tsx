@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 
 export const Route = createFileRoute("/_app/profile")({
-  head: () => ({ meta: [{ title: "Perfil — PontoCorp" }] }),
+  head: () => ({ meta: [{ title: "Perfil — Ponto DCT" }] }),
   component: ProfilePage,
 });
 

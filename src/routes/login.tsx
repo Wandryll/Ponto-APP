@@ -1,13 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { useEffect, useState } from "react";
-import { ShieldCheck, Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/auth-context";
+import { BrandLogos } from "@/components/layout/brand-logos";
 
 interface LoginForm {
   email: string;
@@ -15,7 +16,7 @@ interface LoginForm {
 }
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Entrar — Ponto" }] }),
+  head: () => ({ meta: [{ title: "Entrar — Ponto DCT" }] }),
   component: LoginPage,
 });
 
@@ -49,46 +50,45 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen w-full flex">
-      <div className="hidden lg:flex flex-1 flex-col justify-between bg-sidebar text-sidebar-foreground p-12 relative overflow-hidden">
-        <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-primary/30 blur-3xl" />
-        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-primary/20 blur-3xl" />
-        <div className="relative flex items-center gap-3">
-          <div className="grid h-24 w-43 place-items-center rounded-xl bg-primary text-primary-foreground">
-            <img src="logo_itm.png" alt="Logo ITM" />
-          </div>
-          <div>
-            <div className="font-bold text-lg">ITM</div>
-            <div className="text-xs text-sidebar-foreground/60">Gestão de Equipe</div>
+      <div className="relative hidden flex-1 flex-col justify-between overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex">
+        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-sidebar-primary/15 blur-3xl" />
+        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-sidebar-primary/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,transparent_0%,transparent_55%,rgb(237_183_46/0.045)_100%)]" />
+        <div className="relative space-y-4">
+          <BrandLogos />
+          <div className="flex items-center gap-3">
+            <span className="h-px w-8 bg-sidebar-primary" />
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-sidebar-primary">
+              Ponto DCT
+            </span>
           </div>
         </div>
         <div className="relative space-y-4 max-w-md">
-          <h1 className="text-4xl font-bold leading-tight">
-            Controle de ponto inteligente para equipes modernas.
+          <h1 className="text-4xl font-bold leading-tight tracking-tight">
+            Controle de ponto simples, seguro e conectado.
           </h1>
           <p className="text-sidebar-foreground/70">
             Registros com geolocalização, foto e relatórios completos. Tudo em uma única plataforma.
           </p>
         </div>
         <div className="relative text-xs text-sidebar-foreground/50">
-          © {new Date().getFullYear()} ITM. Todos os direitos reservados.
+          © {new Date().getFullYear()} DCT · Prefeitura de Manacapuru
         </div>
       </div>
 
-      <div className="flex flex-1 items-center justify-center p-6 sm:p-12 bg-background">
+      <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-background p-6 sm:p-12">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-primary/5 blur-3xl" />
         <div className="w-full max-w-md space-y-8">
-          <div className="lg:hidden flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="font-bold">ITM</div>
-            </div>
+          <div className="lg:hidden">
+            <BrandLogos compact />
+            <div className="mt-3 text-sm font-bold tracking-wide">Ponto DCT</div>
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Acesse sua conta</h2>
+            <div className="mb-4 h-1 w-12 rounded-full bg-primary" />
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Acesse sua conta</h2>
             <p className="text-sm text-muted-foreground">
-              Entre com seu e-mail corporativo para continuar.
+              Entre com seu e-mail institucional para continuar.
             </p>
           </div>
 
@@ -100,7 +100,7 @@ function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="voce@empresa.com"
+                  placeholder="seu.email@dominio.gov.br"
                   className="pl-9"
                   {...register("email", {
                     required: "Informe o e-mail",
@@ -143,7 +143,11 @@ function LoginPage() {
               )}
             </div>
 
-            <Button type="submit" className="w-full h-11 text-base" disabled={submitting}>
+            <Button
+              type="submit"
+              className="h-11 w-full text-base shadow-md shadow-primary/10"
+              disabled={submitting}
+            >
               {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
               Entrar
             </Button>

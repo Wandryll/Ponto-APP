@@ -23,7 +23,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { calculateWorkedMilliseconds } from "@/lib/attendance";
 
 export const Route = createFileRoute("/_app/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — ITM" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — Ponto DCT" }] }),
   component: DashboardPage,
 });
 

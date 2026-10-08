@@ -29,7 +29,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 
 export const Route = createFileRoute("/_app/team")({
-  head: () => ({ meta: [{ title: "Equipe — PontoCorp" }] }),
+  head: () => ({ meta: [{ title: "Equipe — Ponto DCT" }] }),
   component: TeamPage,
 });
 

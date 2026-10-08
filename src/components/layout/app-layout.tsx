@@ -10,7 +10,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
       </div>
       <div className="flex-1 flex flex-col min-w-0">
         <AppHeader />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="relative flex-1 overflow-hidden p-4 sm:p-6 lg:p-8">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-primary/[0.035] to-transparent" />
+          <div className="relative">{children}</div>
+        </main>
       </div>
     </div>
   );
