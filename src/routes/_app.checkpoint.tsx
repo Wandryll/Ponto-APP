@@ -31,6 +31,7 @@ interface Coords {
   lng: number;
   address: string;
   accuracy: number;
+  capturedAt: number;
 }
 
 interface WorkLocation {
@@ -42,6 +43,7 @@ interface WorkLocation {
 
 const STORAGE_BUCKET = "fotos_ponto";
 const REGISTROS_TABLE = "registros_acesso";
+const LOCATION_MAX_AGE_MS = 2 * 60 * 1000;
 
 function distanceInMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
   const toRadians = (value: number) => (value * Math.PI) / 180;
@@ -67,6 +69,7 @@ function CheckpointPage() {
   const [geofenceError, setGeofenceError] = useState<string | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<CheckpointType | null>(null);
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
   const requestLocation = () => {
     setLocating(true);
@@ -84,7 +87,13 @@ function CheckpointPage() {
         const { latitude, longitude, accuracy } = pos.coords;
         const fallbackAddress = `Lat ${latitude.toFixed(4)}, Lng ${longitude.toFixed(4)}`;
 
-        setCoords({ lat: latitude, lng: longitude, address: fallbackAddress, accuracy });
+        setCoords({
+          lat: latitude,
+          lng: longitude,
+          address: fallbackAddress,
+          accuracy,
+          capturedAt: Date.now(),
+        });
         setLocating(false);
 
         try {
@@ -138,6 +147,11 @@ function CheckpointPage() {
     void fetchWorkLocation();
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   if (!user) return null;
 
   const today = new Date().toDateString();
@@ -154,7 +168,10 @@ function CheckpointPage() {
       : null;
   const isInsideGeofence =
     distance !== null && workLocation !== null && distance <= workLocation.raio_metros;
-  const locationReady = Boolean(coords && workLocation && isInsideGeofence && !locating);
+  const isLocationFresh = Boolean(coords && currentTime - coords.capturedAt <= LOCATION_MAX_AGE_MS);
+  const locationReady = Boolean(
+    coords && workLocation && isInsideGeofence && isLocationFresh && !locating,
+  );
 
   const handleSubmit = async (type: CheckpointType) => {
     if ((type === "CHECKIN" && !canCheckin) || (type === "CHECKOUT" && !canCheckout)) {
@@ -168,6 +185,11 @@ function CheckpointPage() {
 
     if (!coords) {
       toast.error("Aguarde a localização ser obtida.");
+      return;
+    }
+
+    if (!isLocationFresh) {
+      toast.error("Atualize sua localização antes de registrar o ponto.");
       return;
     }
 
@@ -309,6 +331,11 @@ function CheckpointPage() {
                         : `Fora da área autorizada de ${workLocation.raio_metros} m.`}
                     </span>
                   </div>
+                )}
+                {!isLocationFresh && (
+                  <p className="text-sm text-warning">
+                    A localização expirou. Atualize-a antes de registrar o ponto.
+                  </p>
                 )}
                 {geofenceError && <p className="text-sm text-destructive">{geofenceError}</p>}
               </>

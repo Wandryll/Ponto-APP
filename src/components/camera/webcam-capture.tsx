@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, RefreshCcw, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -10,44 +10,93 @@ interface Props {
 export function WebcamCapture({ value, onChange }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const mountedRef = useRef(true);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [starting, setStarting] = useState(false);
 
   const stop = () => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    if (videoRef.current) videoRef.current.srcObject = null;
     setActive(false);
+    setReady(false);
+    setStarting(false);
   };
 
   const start = async () => {
+    if (starting || active) return;
+
     setError(null);
+    setReady(false);
+    setStarting(true);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("A câmera não está disponível neste navegador ou conexão.");
+      setStarting(false);
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 640, height: 480 },
+        video: {
+          facingMode: { ideal: "user" },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+        },
         audio: false,
       });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
       }
+      streamRef.current = stream;
       setActive(true);
     } catch (e) {
-      setError("Não foi possível acessar a câmera. Verifique as permissões.");
+      if (mountedRef.current) {
+        setError("Não foi possível acessar a câmera. Verifique as permissões.");
+      }
       console.error(e);
+    } finally {
+      if (mountedRef.current) setStarting(false);
     }
   };
 
-  useEffect(() => () => stop(), []);
+  const connectVideo = useCallback((element: HTMLVideoElement | null) => {
+    videoRef.current = element;
+    if (!element || !streamRef.current) return;
+
+    element.srcObject = streamRef.current;
+    void element.play().catch((playError) => {
+      setError("Não foi possível iniciar a visualização da câmera.");
+      console.error(playError);
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    },
+    [],
+  );
 
   const capture = () => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !ready || video.videoWidth === 0 || video.videoHeight === 0) {
+      setError("Aguarde a câmera terminar de carregar.");
+      return;
+    }
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      setError("Não foi possível processar a foto capturada.");
+      return;
+    }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
     onChange(dataUrl);
@@ -65,7 +114,14 @@ export function WebcamCapture({ value, onChange }: Props) {
         {value ? (
           <img src={value} alt="Foto capturada" className="h-full w-full object-cover" />
         ) : active ? (
-          <video ref={videoRef} className="h-full w-full object-cover" playsInline muted />
+          <video
+            ref={connectVideo}
+            className="h-full w-full object-cover"
+            playsInline
+            muted
+            autoPlay
+            onCanPlay={() => setReady(true)}
+          />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-muted-foreground">
             <Camera className="h-10 w-10" />
@@ -81,13 +137,13 @@ export function WebcamCapture({ value, onChange }: Props) {
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex flex-wrap gap-2">
         {!value && !active && (
-          <Button type="button" onClick={start} className="gap-2">
-            <Camera className="h-4 w-4" /> Abrir câmera
+          <Button type="button" onClick={start} className="gap-2" disabled={starting}>
+            <Camera className="h-4 w-4" /> {starting ? "Abrindo câmera..." : "Abrir câmera"}
           </Button>
         )}
         {!value && active && (
-          <Button type="button" onClick={capture} className="gap-2">
-            <Camera className="h-4 w-4" /> Tirar foto
+          <Button type="button" onClick={capture} className="gap-2" disabled={!ready}>
+            <Camera className="h-4 w-4" /> {ready ? "Tirar foto" : "Iniciando câmera..."}
           </Button>
         )}
         {value && (

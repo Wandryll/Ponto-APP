@@ -28,6 +28,7 @@ Teste pelo menos:
 - [ ] Check-in permitido dentro da geocerca de 35 metros.
 - [ ] Check-in rejeitado pelo banco fora da geocerca.
 - [ ] Precisão e distância da localização aparecem corretamente.
+- [ ] Localização com mais de dois minutos exige atualização antes do registro.
 - [ ] Novo check-in bloqueado até existir check-out.
 - [ ] Check-out registrado corretamente.
 - [ ] Histórico mostra somente os próprios registros.
