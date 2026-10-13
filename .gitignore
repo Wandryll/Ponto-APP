@@ -10,6 +10,7 @@ build/
 .vinxi/
 .tsr/
 .tanstack/
+supabase/.temp/
 *.tsbuildinfo
 .eslintcache
 .stylelintcache
