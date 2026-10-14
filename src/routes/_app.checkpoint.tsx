@@ -44,6 +44,31 @@ interface WorkLocation {
 const STORAGE_BUCKET = "fotos_ponto";
 const REGISTROS_TABLE = "registros_acesso";
 const LOCATION_MAX_AGE_MS = 2 * 60 * 1000;
+const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024;
+
+function dataUrlToBlob(dataUrl: string) {
+  const separatorIndex = dataUrl.indexOf(",");
+  if (separatorIndex === -1) throw new Error("A foto capturada está em um formato inválido.");
+
+  const metadata = dataUrl.slice(0, separatorIndex);
+  const encodedData = dataUrl.slice(separatorIndex + 1);
+  const mimeType = metadata.match(/^data:([^;]+);base64$/)?.[1];
+  if (!mimeType || mimeType !== "image/jpeg") {
+    throw new Error("A foto capturada não está no formato JPEG esperado.");
+  }
+
+  const binary = window.atob(encodedData);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mimeType });
+}
+
+function isNetworkError(error: unknown) {
+  return error instanceof TypeError && /fetch|network|load/i.test(error.message);
+}
 
 function distanceInMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
   const toRadians = (value: number) => (value * Math.PI) / 180;
@@ -201,34 +226,54 @@ function CheckpointPage() {
     setSubmitting(type);
 
     try {
-      const response = await fetch(photo);
-      if (!response.ok) {
-        throw new Error("Não foi possível ler a foto capturada.");
+      const blob = dataUrlToBlob(photo);
+      if (blob.size > MAX_PHOTO_SIZE_BYTES) {
+        throw new Error("A foto ficou muito grande. Tire outra foto e tente novamente.");
       }
 
-      const blob = await response.blob();
       const safeUserId = encodeURIComponent(user.id);
       const fileName = `${safeUserId}/${Date.now()}.jpg`;
 
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(fileName, blob, {
-          contentType: "image/jpeg",
-          cacheControl: "3600",
-          upsert: false,
-        });
+      let uploadError: { message: string } | null;
+      try {
+        ({ error: uploadError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(fileName, blob, {
+            contentType: "image/jpeg",
+            cacheControl: "3600",
+            upsert: false,
+          }));
+      } catch (error) {
+        if (isNetworkError(error)) {
+          throw new Error(
+            "Não foi possível conectar ao armazenamento. Verifique sua internet e tente novamente.",
+          );
+        }
+        throw error;
+      }
 
       if (uploadError) {
         throw new Error(`Erro ao salvar foto: ${uploadError.message}`);
       }
 
-      const { error: insertError } = await supabase.from(REGISTROS_TABLE).insert({
-        colaborador_id: user.id,
-        tipo: type,
-        latitude: coords.lat,
-        longitude: coords.lng,
-        foto_path: fileName,
-      });
+      let insertError: { message: string } | null;
+      try {
+        ({ error: insertError } = await supabase.from(REGISTROS_TABLE).insert({
+          colaborador_id: user.id,
+          tipo: type,
+          latitude: coords.lat,
+          longitude: coords.lng,
+          foto_path: fileName,
+        }));
+      } catch (error) {
+        await supabase.storage.from(STORAGE_BUCKET).remove([fileName]);
+        if (isNetworkError(error)) {
+          throw new Error(
+            "A foto foi enviada, mas não foi possível conectar ao registro de ponto. Tente novamente.",
+          );
+        }
+        throw error;
+      }
 
       if (insertError) {
         await supabase.storage.from(STORAGE_BUCKET).remove([fileName]);
