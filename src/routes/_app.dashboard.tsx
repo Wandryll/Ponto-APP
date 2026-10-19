@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
 import { calculateWorkedMilliseconds } from "@/lib/attendance";
+import { useAuth } from "@/contexts/auth-context";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — Ponto DCT" }] }),
@@ -28,22 +29,88 @@ export const Route = createFileRoute("/_app/dashboard")({
 });
 
 function DashboardPage() {
-  const { records } = useRecords();
+  const { user } = useAuth();
+  const { records, refresh } = useRecords();
   const [activeEmployees, setActiveEmployees] = useState(0);
+  const [globalSummary, setGlobalSummary] = useState<{
+    activeEmployees: number;
+    checkins: number;
+    checkouts: number;
+    present: number;
+    absent: number;
+  } | null>(null);
+
   useEffect(() => {
+    const updateDashboard = async () => {
+      const { data, error } = await supabase.rpc("dashboard_resumo");
+      if (!error && data?.[0]) {
+        const summary = data[0] as {
+          funcionarios_ativos: number;
+          checkins_hoje: number;
+          checkouts_hoje: number;
+          presentes: number;
+          sem_checkin: number;
+        };
+        setGlobalSummary({
+          activeEmployees: Number(summary.funcionarios_ativos),
+          checkins: Number(summary.checkins_hoje),
+          checkouts: Number(summary.checkouts_hoje),
+          present: Number(summary.presentes),
+          absent: Number(summary.sem_checkin),
+        });
+      } else if (error) {
+        console.error("Falha ao atualizar o resumo da equipe:", error);
+      }
+
+      if (user?.role === "admin") await refresh();
+    };
+
+    void updateDashboard();
+    const timer = window.setInterval(() => void updateDashboard(), 30_000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void updateDashboard();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [refresh, user?.role]);
+
+  useEffect(() => {
+    if (globalSummary) {
+      setActiveEmployees(globalSummary.activeEmployees);
+      return;
+    }
     void supabase
       .from("colaboradores")
       .select("id", { count: "exact", head: true })
       .eq("ativo", true)
       .then(({ count }) => setActiveEmployees(count ?? 0));
-  }, []);
+  }, [globalSummary]);
+
   const today = new Date().toDateString();
   const todayRecords = records.filter((r) => new Date(r.timestamp).toDateString() === today);
-  const checkins = todayRecords.filter((r) => r.type === "checkin");
-  const checkouts = todayRecords.filter((r) => r.type === "checkout");
-  const presentIds = new Set(checkins.map((r) => r.userId));
-  const present = presentIds.size;
-  const absent = Math.max(0, activeEmployees - present);
+  const localCheckins = new Set(
+    todayRecords.filter((r) => r.type === "checkin").map((r) => r.userId),
+  ).size;
+  const localCheckouts = new Set(
+    todayRecords.filter((r) => r.type === "checkout").map((r) => r.userId),
+  ).size;
+  const latestByEmployee = new Map<string, (typeof todayRecords)[number]>();
+  todayRecords
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .forEach((record) => {
+      if (!latestByEmployee.has(record.userId)) latestByEmployee.set(record.userId, record);
+    });
+  const localPresent = Array.from(latestByEmployee.values()).filter(
+    (record) => record.type === "checkin",
+  ).length;
+  const checkins = globalSummary?.checkins ?? localCheckins;
+  const checkouts = globalSummary?.checkouts ?? localCheckouts;
+  const present = globalSummary?.present ?? localPresent;
+  const absent = globalSummary?.absent ?? Math.max(0, activeEmployees - localCheckins);
   const weeklyAttendance = useMemo(() => {
     const formatter = new Intl.DateTimeFormat("pt-BR", { weekday: "short" });
     return Array.from({ length: 7 }, (_, offset) => {
@@ -121,12 +188,12 @@ function DashboardPage() {
         />
         <StatCard
           title="Check-ins hoje"
-          value={checkins.length}
+          value={checkins}
           icon={LogIn}
           tone="success"
-          trend={`${activeEmployees ? Math.round((checkins.length / activeEmployees) * 100) : 0}% da equipe`}
+          trend={`${activeEmployees ? Math.round((checkins / activeEmployees) * 100) : 0}% da equipe`}
         />
-        <StatCard title="Check-outs hoje" value={checkouts.length} icon={LogOut} tone="default" />
+        <StatCard title="Check-outs hoje" value={checkouts} icon={LogOut} tone="default" />
         <StatCard title="Presentes" value={present} icon={UserCheck} tone="success" />
         <StatCard title="Sem check-in" value={absent} icon={UserX} tone="destructive" />
       </div>

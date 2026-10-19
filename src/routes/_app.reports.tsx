@@ -21,6 +21,11 @@ import { useRecords } from "@/contexts/records-context";
 import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 import { calculateWorkedMilliseconds } from "@/lib/attendance";
+import {
+  downloadAttendanceCsv,
+  printAttendanceReport,
+  type AttendanceExportRow,
+} from "@/lib/report-export";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Relatórios — Ponto DCT" }] }),
@@ -125,7 +130,61 @@ function ReportsPage() {
     };
   }, [filtered]);
 
-  const handleExport = () => toast.info("Exportação ainda não implementada.");
+  const exportRows = useMemo<AttendanceExportRow[]>(() => {
+    const employeeById = new Map(employees.map((item) => [item.id, item]));
+    return [...filtered]
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      .map((record) => ({
+        employee: employeeById.get(record.userId)?.nome ?? record.userName,
+        team: employeeById.get(record.userId)?.equipe ?? "Sem equipe",
+        type: record.type,
+        timestamp: record.timestamp,
+        latitude: record.latitude,
+        longitude: record.longitude,
+      }));
+  }, [employees, filtered]);
+
+  const exportFilename = `registros-ponto-${start || "inicio"}-${end || dateKey(new Date())}`;
+  const selectedEmployee = employees.find((item) => item.id === employee)?.nome ?? "Todos";
+  const selectedTeam = team === "all" ? "Todas" : team;
+  const period = `${start || "Início"} até ${end || dateKey(new Date())}`;
+
+  const ensureExportData = () => {
+    if (loading) {
+      toast.info("Aguarde o carregamento dos registros.");
+      return false;
+    }
+    if (!exportRows.length) {
+      toast.info("Não há registros para os filtros selecionados.");
+      return false;
+    }
+    if (start && end && start > end) {
+      toast.error("A data inicial deve ser anterior à data final.");
+      return false;
+    }
+    return true;
+  };
+
+  const handleExcelExport = () => {
+    if (!ensureExportData()) return;
+    downloadAttendanceCsv(exportRows, `${exportFilename}.csv`);
+    toast.success("Planilha exportada com sucesso.");
+  };
+
+  const handlePdfExport = () => {
+    if (!ensureExportData()) return;
+    const opened = printAttendanceReport(exportRows, {
+      period,
+      employee: selectedEmployee,
+      team: selectedTeam,
+      daysWorked: metrics.daysWorked,
+      late: metrics.late,
+      totalHours: metrics.totalHours,
+      averageHours: metrics.average,
+      overtimeHours: metrics.overtime,
+    });
+    if (!opened) toast.error("Permita pop-ups para gerar o relatório em PDF.");
+  };
 
   if (user?.role !== "admin") return <Navigate to="/dashboard" />;
 
@@ -139,10 +198,10 @@ function ReportsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={handleExport}>
+          <Button variant="outline" className="gap-2" onClick={handlePdfExport}>
             <FileDown className="h-4 w-4" /> PDF
           </Button>
-          <Button variant="outline" className="gap-2" onClick={handleExport}>
+          <Button variant="outline" className="gap-2" onClick={handleExcelExport}>
             <FileSpreadsheet className="h-4 w-4" /> Excel
           </Button>
         </div>

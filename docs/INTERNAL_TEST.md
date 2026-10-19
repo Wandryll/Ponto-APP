@@ -31,6 +31,8 @@ Teste pelo menos:
 - [ ] Localização com mais de dois minutos exige atualização antes do registro.
 - [ ] Novo check-in bloqueado até existir check-out.
 - [ ] Check-out registrado corretamente.
+- [ ] Dashboard em outro dispositivo atualiza os totais globais em até 30 segundos.
+- [ ] Funcionário que fez check-out deixa de aparecer como presente.
 - [ ] Histórico mostra somente os próprios registros.
 - [ ] Foto privada não abre para outro funcionário.
 - [ ] Perfil salva nome, avatar e senha.
@@ -42,6 +44,9 @@ Teste pelo menos:
 - [ ] Cria funcionário pela aplicação.
 - [ ] Usuário criado consegue entrar.
 - [ ] Visualiza registros e fotos da equipe.
+- [ ] Exporta os registros filtrados em CSV e abre o arquivo no Excel.
+- [ ] Gera a versão de impressão e salva o relatório como PDF.
+- [ ] Exportação sem registros apresenta uma mensagem e não gera arquivo vazio.
 - [ ] Não recebe privilégios administrativos indevidos em contas comuns.
 
 ## Falhas esperadas

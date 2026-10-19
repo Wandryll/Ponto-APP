@@ -77,7 +77,8 @@ auditoria de dependências em pushes para `main` e pull requests.
 ## Limitações conhecidas
 
 - faltas exigem uma escala de trabalho configurável, ainda não implementada;
-- exportação em PDF e Excel ainda não está disponível;
+- a exportação em Excel gera um arquivo CSV compatível; a opção PDF abre a impressão do
+  navegador para salvar o relatório como PDF;
 - ativação, desativação e edição de funcionários ainda não estão disponíveis na interface;
 - não há geocerca para limitar registros ao local de trabalho;
 - o sistema requer conexão com a internet;
