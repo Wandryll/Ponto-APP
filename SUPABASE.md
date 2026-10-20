@@ -41,6 +41,10 @@ Editor. Não use os dois métodos para as mesmas migrations sem conferir o hist�
 A migration configura RLS, permissões por coluna, validação da sequência de ponto, limitação de
 uploads e os buckets `fotos_ponto` e `avatares`.
 
+A migration `20261020030000_filter_admin_report_records.sql` adiciona a consulta paginada por
+período usada pelos relatórios institucionais. Ela deve ser aplicada antes de publicar a nova
+versão do frontend; caso contrário, a página de relatórios exibirá erro ao carregar os registros.
+
 ## 4. Criar o primeiro administrador
 
 Crie o usuário em **Authentication > Users > Add user** e confirme o e-mail. Em seguida, execute

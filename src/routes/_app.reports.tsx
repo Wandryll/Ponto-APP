@@ -1,8 +1,14 @@
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, FileDown, FileSpreadsheet } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock3,
+  FileDown,
+  FileSpreadsheet,
+  LoaderCircle,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,16 +22,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StatCard } from "@/components/ui/stat-card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/auth-context";
-import { supabase } from "@/lib/supabaseClient";
-import { calculateWorkedMilliseconds } from "@/lib/attendance";
-import type { CheckpointRecord } from "@/types";
 import {
-  downloadAttendanceCsv,
-  printAttendanceReport,
-  type AttendanceExportRow,
+  addDays,
+  buildEmployeeAttendanceReports,
+  formatDuration,
+  formatReportTime,
+  limitAttendanceReportPeriod,
+  monthPeriod,
+  reportDateKey,
+  type EmployeeAttendanceReport,
+} from "@/lib/attendance-report";
+import {
+  exportGeneralPdf,
+  exportGeneralXlsx,
+  exportIndividualPdf,
+  exportIndividualXlsx,
+  type ReportMetadata,
 } from "@/lib/report-export";
+import { supabase } from "@/lib/supabaseClient";
+import type { CheckpointRecord } from "@/types";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Relatórios — Ponto DCT" }] }),
@@ -50,20 +66,38 @@ interface AdminReportRow {
   longitude: number;
 }
 
-const dateKey = (value: Date | string) => {
-  const date = value instanceof Date ? value : new Date(value);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-};
+type ReportType = "general" | "individual";
+type PeriodType = "weekly" | "biweekly" | "monthly" | "custom";
+type ExportType = "pdf" | "xlsx";
+
+function presetPeriod(type: Exclude<PeriodType, "custom">) {
+  const today = reportDateKey(new Date());
+  if (type === "weekly") return { start: addDays(today, -6), end: today };
+  if (type === "biweekly") return { start: addDays(today, -14), end: today };
+  return monthPeriod();
+}
+
+function fileSafeName(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
 
 function ReportsPage() {
   const { user } = useAuth();
+  const initialPeriod = useMemo(() => monthPeriod(), []);
   const [records, setRecords] = useState<CheckpointRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState<ExportType | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [reportType, setReportType] = useState<ReportType>("general");
+  const [periodType, setPeriodType] = useState<PeriodType>("monthly");
   const [employee, setEmployee] = useState("all");
   const [team, setTeam] = useState("all");
-  const [start, setStart] = useState("");
-  const [end, setEnd] = useState("");
+  const [start, setStart] = useState(initialPeriod.start);
+  const [end, setEnd] = useState(initialPeriod.end);
 
   useEffect(() => {
     void supabase
@@ -77,18 +111,24 @@ function ReportsPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.role !== "admin") {
+    if (user?.role !== "admin" || !start || !end || start > end) {
       setLoading(false);
+      setRecords([]);
       return;
     }
 
-    const fetchAllRecords = async () => {
+    let cancelled = false;
+    const fetchRecords = async () => {
       setLoading(true);
       try {
         const rows: AdminReportRow[] = [];
         const pageSize = 1000;
+        const periodStart = `${addDays(start, -1)}T04:00:00.000Z`;
+        const periodEnd = `${addDays(end, 2)}T04:00:00.000Z`;
         for (let offset = 0; ; offset += pageSize) {
-          const { data, error } = await supabase.rpc("relatorio_registros_admin", {
+          const { data, error } = await supabase.rpc("relatorio_registros_admin_periodo", {
+            periodo_inicio: periodStart,
+            periodo_fim: periodEnd,
             limite: pageSize,
             deslocamento: offset,
           });
@@ -97,7 +137,7 @@ function ReportsPage() {
           rows.push(...page);
           if (page.length < pageSize) break;
         }
-
+        if (cancelled) return;
         setRecords(
           rows.map((row) => ({
             id: String(row.id),
@@ -108,173 +148,201 @@ function ReportsPage() {
             timestamp: row.data_hora,
             latitude: Number(row.latitude),
             longitude: Number(row.longitude),
-            address: `Lat. ${Number(row.latitude).toFixed(5)}, Long. ${Number(row.longitude).toFixed(5)}`,
+            address: "",
             photo: "",
             status: "on_time",
           })),
         );
       } catch (error) {
         console.error("Falha ao carregar registros administrativos:", error);
-        setRecords([]);
-        toast.error("Não foi possível carregar os registros de toda a equipe.");
+        if (!cancelled) {
+          setRecords([]);
+          toast.error("Não foi possível carregar os registros do período.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
+    void fetchRecords();
+    return () => {
+      cancelled = true;
+    };
+  }, [end, start, user?.role]);
 
-    void fetchAllRecords();
-  }, [user?.role]);
-
+  const activeEmployees = useMemo(() => employees.filter((item) => item.ativo), [employees]);
   const teams = useMemo(
-    () => Array.from(new Set(employees.map((item) => item.equipe).filter(Boolean))) as string[],
-    [employees],
-  );
-  const eligibleIds = useMemo(
     () =>
-      new Set(
-        employees
-          .filter((item) => employee === "all" || item.id === employee)
-          .filter((item) => team === "all" || item.equipe === team)
-          .map((item) => item.id),
+      Array.from(new Set(activeEmployees.map((item) => item.equipe).filter(Boolean))) as string[],
+    [activeEmployees],
+  );
+  const selectedEmployees = useMemo(
+    () =>
+      activeEmployees
+        .filter((item) => employee === "all" || item.id === employee)
+        .filter((item) => team === "all" || item.equipe === team)
+        .map((item) => ({ id: item.id, name: item.nome, team: item.equipe ?? "Sem equipe" })),
+    [activeEmployees, employee, team],
+  );
+  const reports = useMemo(
+    () =>
+      buildEmployeeAttendanceReports(selectedEmployees, records).map((report) =>
+        limitAttendanceReportPeriod(report, start, end),
       ),
-    [employees, employee, team],
+    [end, records, selectedEmployees, start],
   );
-  const filtered = useMemo(
-    () =>
-      records.filter((record) => {
-        const key = dateKey(record.timestamp);
-        return eligibleIds.has(record.userId) && (!start || key >= start) && (!end || key <= end);
-      }),
-    [records, eligibleIds, start, end],
+  const individualReport = employee === "all" ? null : (reports[0] ?? null);
+  const totals = useMemo(
+    () => ({
+      employees: reports.length,
+      totalMs: reports.reduce((total, report) => total + report.totalMs, 0),
+      pending: reports.reduce((total, report) => total + report.pendingCount, 0),
+    }),
+    [reports],
   );
-
-  const metrics = useMemo(() => {
-    const grouped = new Map<string, typeof filtered>();
-    filtered.forEach((record) => {
-      const key = `${record.userId}:${dateKey(record.timestamp)}`;
-      grouped.set(key, [...(grouped.get(key) ?? []), record]);
-    });
-
-    let totalMs = 0;
-    let late = 0;
-    const hoursByDay = new Map<string, number>();
-    grouped.forEach((items) => {
-      const sorted = [...items].sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
-      );
-      const firstCheckin = sorted.find((item) => item.type === "checkin");
-      if (firstCheckin) {
-        const time = new Date(firstCheckin.timestamp);
-        if (time.getHours() > 9 || (time.getHours() === 9 && time.getMinutes() > 0)) late += 1;
-      }
-      const duration = calculateWorkedMilliseconds(sorted);
-      totalMs += duration;
-      const key = dateKey(sorted[0].timestamp);
-      hoursByDay.set(key, (hoursByDay.get(key) ?? 0) + duration / 3_600_000);
-    });
-
-    const totalHours = totalMs / 3_600_000;
-    const workdays = grouped.size;
-    const daysWorked = new Set(filtered.map((record) => dateKey(record.timestamp))).size;
-    const chart = Array.from(hoursByDay.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([day, horas]) => ({
-        day: day.slice(5).split("-").reverse().join("/"),
-        horas: Number(horas.toFixed(2)),
-      }));
-    return {
-      daysWorked,
-      late,
-      totalHours,
-      average: workdays ? totalHours / workdays : 0,
-      overtime: Math.max(0, totalHours - workdays * 8),
-      chart,
-    };
-  }, [filtered]);
-
-  const exportRows = useMemo<AttendanceExportRow[]>(() => {
-    const employeeById = new Map(employees.map((item) => [item.id, item]));
-    return [...filtered]
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-      .map((record) => ({
-        employee: employeeById.get(record.userId)?.nome ?? record.userName,
-        team: employeeById.get(record.userId)?.equipe ?? "Sem equipe",
-        type: record.type,
-        timestamp: record.timestamp,
-        latitude: record.latitude,
-        longitude: record.longitude,
-      }));
-  }, [employees, filtered]);
-
-  const exportFilename = `registros-ponto-${start || "inicio"}-${end || dateKey(new Date())}`;
-  const selectedEmployee = employees.find((item) => item.id === employee)?.nome ?? "Todos";
   const selectedTeam = team === "all" ? "Todas" : team;
-  const period = `${start || "Início"} até ${end || dateKey(new Date())}`;
+  const metadata: ReportMetadata = {
+    start,
+    end,
+    generatedBy: user?.name ?? "Administrador",
+    team: selectedTeam,
+  };
+
+  const handlePeriodChange = (value: PeriodType) => {
+    setPeriodType(value);
+    if (value !== "custom") {
+      const period = presetPeriod(value);
+      setStart(period.start);
+      setEnd(period.end);
+    }
+  };
+
+  const changeCustomDate = (setter: (value: string) => void, value: string) => {
+    setPeriodType("custom");
+    setter(value);
+  };
 
   const ensureExportData = () => {
     if (loading) {
       toast.info("Aguarde o carregamento dos registros.");
       return false;
     }
-    if (!exportRows.length) {
-      toast.info("Não há registros para os filtros selecionados.");
+    if (!start || !end || start > end) {
+      toast.error("Informe um período válido.");
       return false;
     }
-    if (start && end && start > end) {
-      toast.error("A data inicial deve ser anterior à data final.");
+    if (reportType === "individual" && !individualReport) {
+      toast.info("Selecione um funcionário para gerar o espelho de ponto.");
+      return false;
+    }
+    if (!reports.length) {
+      toast.info("Não há funcionários para os filtros selecionados.");
       return false;
     }
     return true;
   };
 
-  const handleExcelExport = () => {
+  const handleExport = async (format: ExportType) => {
     if (!ensureExportData()) return;
-    downloadAttendanceCsv(exportRows, `${exportFilename}.csv`);
-    toast.success("Planilha exportada com sucesso.");
+    setExporting(format);
+    try {
+      const reference = `${start.slice(0, 7)}_${end.slice(0, 7)}`;
+      if (reportType === "general") {
+        const filename = `Relatorio_Geral_DCT_${reference}.${format === "pdf" ? "pdf" : "xlsx"}`;
+        if (format === "pdf") await exportGeneralPdf(reports, metadata, filename);
+        else await exportGeneralXlsx(reports, metadata, filename);
+      } else if (individualReport) {
+        const name = fileSafeName(individualReport.name);
+        const filename = `Espelho_Ponto_${name}_${reference}.${format === "pdf" ? "pdf" : "xlsx"}`;
+        if (format === "pdf") await exportIndividualPdf(individualReport, metadata, filename);
+        else await exportIndividualXlsx(individualReport, metadata, filename);
+      }
+      toast.success(`${format === "pdf" ? "PDF" : "Planilha"} gerado com sucesso.`);
+    } catch (error) {
+      console.error("Falha ao exportar relatório:", error);
+      toast.error("Não foi possível gerar o arquivo.");
+    } finally {
+      setExporting(null);
+    }
   };
 
-  const handlePdfExport = () => {
-    if (!ensureExportData()) return;
-    const opened = printAttendanceReport(exportRows, {
-      period,
-      employee: selectedEmployee,
-      team: selectedTeam,
-      generatedBy: user?.name ?? "Administrador",
-      daysWorked: employee === "all" ? null : metrics.daysWorked,
-      late: metrics.late,
-      totalHours: metrics.totalHours,
-      averageHours: metrics.average,
-      overtimeHours: metrics.overtime,
-    });
-    if (!opened) toast.error("Permita pop-ups para gerar o relatório em PDF.");
-  };
-
-  if (user?.role !== "admin") return <Navigate to="/dashboard" />;
+  if (user?.role !== "admin") return <Navigate to="/checkpoint" />;
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Relatórios</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Análise baseada nos registros salvos no Supabase.
+            Relatórios institucionais de frequência do DCT para a SEMEC.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={handlePdfExport}>
-            <FileDown className="h-4 w-4" /> PDF
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={exporting !== null}
+            onClick={() => void handleExport("pdf")}
+          >
+            {exporting === "pdf" ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            Exportar PDF
           </Button>
-          <Button variant="outline" className="gap-2" onClick={handleExcelExport}>
-            <FileSpreadsheet className="h-4 w-4" /> Excel
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={exporting !== null}
+            onClick={() => void handleExport("xlsx")}
+          >
+            {exporting === "xlsx" ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4" />
+            )}
+            Exportar Excel
           </Button>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Filtros</CardTitle>
+          <CardTitle className="text-base">Filtros do relatório</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tipo de relatório</Label>
+            <Select
+              value={reportType}
+              onValueChange={(value) => setReportType(value as ReportType)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general">Relatório Geral — SEMEC</SelectItem>
+                <SelectItem value="individual">Espelho de Ponto Individual</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Período</Label>
+            <Select
+              value={periodType}
+              onValueChange={(value) => handlePeriodChange(value as PeriodType)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Semanal — últimos 7 dias</SelectItem>
+                <SelectItem value="biweekly">Quinzenal — últimos 15 dias</SelectItem>
+                <SelectItem value="monthly">Mensal — mês atual</SelectItem>
+                <SelectItem value="custom">Personalizado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Funcionário</Label>
             <Select value={employee} onValueChange={setEmployee}>
@@ -282,8 +350,10 @@ function ReportsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                {employees.map((item) => (
+                <SelectItem value="all" disabled={reportType === "individual"}>
+                  {reportType === "general" ? "Todos" : "Selecione um funcionário"}
+                </SelectItem>
+                {activeEmployees.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
                     {item.nome}
                   </SelectItem>
@@ -309,102 +379,207 @@ function ReportsPage() {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Data inicial</Label>
-            <Input type="date" value={start} onChange={(event) => setStart(event.target.value)} />
+            <Input
+              type="date"
+              value={start}
+              onChange={(event) => changeCustomDate(setStart, event.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Data final</Label>
-            <Input type="date" value={end} onChange={(event) => setEnd(event.target.value)} />
+            <Input
+              type="date"
+              value={end}
+              onChange={(event) => changeCustomDate(setEnd, event.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="attendance">
-        <TabsList>
-          <TabsTrigger value="attendance">Presença</TabsTrigger>
-          <TabsTrigger value="hours">Horas trabalhadas</TabsTrigger>
-        </TabsList>
-        <TabsContent value="attendance" className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard
-              title="Dias trabalhados"
-              value={loading || employee === "all" ? "—" : metrics.daysWorked}
-              icon={BarChart3}
-              tone="success"
-              trend={employee === "all" ? "Selecione um funcionário" : undefined}
-            />
-            <StatCard
-              title="Faltas"
-              value={0}
-              icon={BarChart3}
-              tone="destructive"
-              trend="Requer escala de trabalho"
-            />
-            <StatCard
-              title="Atrasos"
-              value={loading ? "—" : metrics.late}
-              icon={BarChart3}
-              tone="warning"
-              trend="Após 09:00"
-            />
-          </div>
-        </TabsContent>
-        <TabsContent value="hours" className="space-y-4 mt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard
-              title="Horas totais"
-              value={`${metrics.totalHours.toFixed(1)}h`}
-              icon={BarChart3}
-              tone="primary"
-            />
-            <StatCard
-              title="Média por dia"
-              value={`${metrics.average.toFixed(1)}h`}
-              icon={BarChart3}
-              tone="success"
-            />
-            <StatCard
-              title="Horas extras"
-              value={`${metrics.overtime.toFixed(1)}h`}
-              icon={BarChart3}
-              tone="warning"
-            />
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Horas por dia</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {metrics.chart.length ? (
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={metrics.chart}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="var(--border)"
-                      />
-                      <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={12} />
-                      <YAxis stroke="var(--muted-foreground)" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{
-                          background: "var(--card)",
-                          border: "1px solid var(--border)",
-                          borderRadius: 8,
-                        }}
-                      />
-                      <Bar dataKey="horas" fill="var(--primary)" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="py-16 text-center text-sm text-muted-foreground">
-                  Nenhum registro encontrado para os filtros selecionados.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {reportType === "general" ? (
+        <GeneralPreview reports={reports} totals={totals} loading={loading} />
+      ) : (
+        <IndividualPreview report={individualReport} loading={loading} />
+      )}
+    </div>
+  );
+}
+
+function GeneralPreview({
+  reports,
+  totals,
+  loading,
+}: {
+  reports: EmployeeAttendanceReport[];
+  totals: { employees: number; totalMs: number; pending: number };
+  loading: boolean;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          title="Funcionários"
+          value={loading ? "—" : totals.employees}
+          icon={Users}
+          tone="primary"
+        />
+        <StatCard
+          title="Horas apuradas"
+          value={loading ? "—" : formatDuration(totals.totalMs)}
+          icon={Clock3}
+          tone="success"
+        />
+        <StatCard
+          title="Pendências"
+          value={loading ? "—" : totals.pending}
+          icon={AlertTriangle}
+          tone={totals.pending ? "warning" : "success"}
+        />
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Prévia do Relatório Geral</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full min-w-[680px] text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="py-3 pr-4">Funcionário</th>
+                <th className="py-3 pr-4">Equipe</th>
+                <th className="py-3 pr-4 text-center">Dias registrados</th>
+                <th className="py-3 pr-4 text-center">Horas apuradas</th>
+                <th className="py-3 text-center">Pendências</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((report) => (
+                <tr key={report.id} className="border-b last:border-0">
+                  <td className="py-3 pr-4 font-medium">{report.name}</td>
+                  <td className="py-3 pr-4">{report.team}</td>
+                  <td className="py-3 pr-4 text-center">{report.daysRegistered}</td>
+                  <td className="py-3 pr-4 text-center">{formatDuration(report.totalMs)}</td>
+                  <td className="py-3 text-center">{report.pendingCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!loading && !reports.length && (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              Nenhum funcionário encontrado para os filtros selecionados.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function IndividualPreview({
+  report,
+  loading,
+}: {
+  report: EmployeeAttendanceReport | null;
+  loading: boolean;
+}) {
+  if (!report)
+    return (
+      <Card>
+        <CardContent className="py-16 text-center text-sm text-muted-foreground">
+          Selecione um funcionário para visualizar o espelho de ponto.
+        </CardContent>
+      </Card>
+    );
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard
+          title="Dias registrados"
+          value={loading ? "—" : report.daysRegistered}
+          icon={Users}
+          tone="primary"
+        />
+        <StatCard
+          title="Horas apuradas"
+          value={loading ? "—" : formatDuration(report.totalMs)}
+          icon={Clock3}
+          tone="success"
+        />
+        <StatCard
+          title="Pendências"
+          value={loading ? "—" : report.pendingCount}
+          icon={AlertTriangle}
+          tone={report.pendingCount ? "warning" : "success"}
+        />
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Espelho de {report.name}</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full min-w-[820px] text-sm">
+            <thead>
+              <tr className="border-b text-left text-muted-foreground">
+                <th className="py-3 pr-3">Data</th>
+                <th className="py-3 pr-3">Entrada 1</th>
+                <th className="py-3 pr-3">Saída 1</th>
+                <th className="py-3 pr-3">Entrada 2</th>
+                <th className="py-3 pr-3">Saída 2</th>
+                <th className="py-3 pr-3">Demais horários</th>
+                <th className="py-3 pr-3">Total</th>
+                <th className="py-3">Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.days.map((day) => {
+                const extra = day.intervals
+                  .slice(2)
+                  .map(
+                    (interval) =>
+                      `${interval.checkin ? formatReportTime(interval.checkin.timestamp) : "—"}–${interval.checkout ? formatReportTime(interval.checkout.timestamp) : "—"}`,
+                  )
+                  .join(" | ");
+                return (
+                  <tr key={day.date} className="border-b last:border-0">
+                    <td className="py-3 pr-3 font-medium">
+                      {day.date.split("-").reverse().join("/")}
+                    </td>
+                    <td className="py-3 pr-3">
+                      {day.intervals[0]?.checkin
+                        ? formatReportTime(day.intervals[0].checkin.timestamp)
+                        : "—"}
+                    </td>
+                    <td className="py-3 pr-3">
+                      {day.intervals[0]?.checkout
+                        ? formatReportTime(day.intervals[0].checkout.timestamp)
+                        : "—"}
+                    </td>
+                    <td className="py-3 pr-3">
+                      {day.intervals[1]?.checkin
+                        ? formatReportTime(day.intervals[1].checkin.timestamp)
+                        : "—"}
+                    </td>
+                    <td className="py-3 pr-3">
+                      {day.intervals[1]?.checkout
+                        ? formatReportTime(day.intervals[1].checkout.timestamp)
+                        : "—"}
+                    </td>
+                    <td className="py-3 pr-3">{extra || "—"}</td>
+                    <td className="py-3 pr-3 font-medium">{formatDuration(day.totalMs)}</td>
+                    <td className="py-3">
+                      {day.status === "complete" ? "Completo" : day.issues.join("; ")}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {!loading && !report.days.length && (
+            <p className="py-12 text-center text-sm text-muted-foreground">
+              Nenhum registro encontrado no período selecionado.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

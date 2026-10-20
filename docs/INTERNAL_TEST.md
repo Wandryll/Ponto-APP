@@ -50,11 +50,19 @@ Teste pelo menos:
 - [ ] Cria funcionário pela aplicação.
 - [ ] Usuário criado consegue entrar.
 - [ ] Visualiza registros e fotos da equipe.
-- [ ] Exporta os registros filtrados em CSV e abre o arquivo no Excel.
-- [ ] Gera a versão de impressão e salva o relatório como PDF.
-- [ ] PDF contém as logos, identificação do DCT, filtros, responsável pela emissão e assinaturas.
-- [ ] Com os filtros em "Todos", o PDF contém registros de toda a equipe.
-- [ ] Selecionar outro funcionário apresenta os registros dele no relatório.
+- [ ] Prévia do relatório geral apresenta uma linha por funcionário em ordem alfabética.
+- [ ] Relatório geral apresenta dias registrados, horas apuradas e pendências por funcionário.
+- [ ] Exporta o relatório geral em PDF e em Excel `.xlsx`.
+- [ ] PDF geral contém logos, identificação DCT/SEMEC, período, paginação e assinaturas.
+- [ ] Excel geral contém a aba "Resumo Geral", filtros nas colunas e totais superiores a 24 horas.
+- [ ] Espelho individual exige a seleção de um funcionário.
+- [ ] Espelho apresenta todos os intervalos do dia sem inventar horários ausentes.
+- [ ] Espelho diferencia ponto em andamento de registro incompleto.
+- [ ] Exporta o espelho individual em PDF e em Excel `.xlsx`.
+- [ ] Jornada atravessando a meia-noite é atribuída à data da entrada.
+- [ ] Nenhum relatório exibe fotos ou coordenadas geográficas.
+- [ ] Com os filtros em "Todos", o relatório geral contém toda a equipe ativa.
+- [ ] Selecionar outro funcionário apresenta somente a apuração dele.
 - [ ] Usuário comum não consegue executar a consulta administrativa do relatório.
 - [ ] Exportação sem registros apresenta uma mensagem e não gera arquivo vazio.
 - [ ] Não recebe privilégios administrativos indevidos em contas comuns.
