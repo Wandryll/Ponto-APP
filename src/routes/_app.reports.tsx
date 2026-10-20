@@ -240,7 +240,7 @@ function ReportsPage() {
       employee: selectedEmployee,
       team: selectedTeam,
       generatedBy: user?.name ?? "Administrador",
-      daysWorked: metrics.daysWorked,
+      daysWorked: employee === "all" ? null : metrics.daysWorked,
       late: metrics.late,
       totalHours: metrics.totalHours,
       averageHours: metrics.average,
@@ -327,9 +327,10 @@ function ReportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <StatCard
               title="Dias trabalhados"
-              value={loading ? "—" : metrics.daysWorked}
+              value={loading || employee === "all" ? "—" : metrics.daysWorked}
               icon={BarChart3}
               tone="success"
+              trend={employee === "all" ? "Selecione um funcionário" : undefined}
             />
             <StatCard
               title="Faltas"

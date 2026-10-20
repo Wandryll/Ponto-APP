@@ -12,7 +12,7 @@ export interface AttendanceReportSummary {
   employee: string;
   team: string;
   generatedBy: string;
-  daysWorked: number;
+  daysWorked: number | null;
   late: number;
   totalHours: number;
   averageHours: number;
@@ -141,7 +141,10 @@ export function printAttendanceReport(
   const summaryElement = doc.createElement("div");
   summaryElement.className = "summary";
   const items = [
-    ["Dias trabalhados", String(summary.daysWorked)],
+    [
+      "Dias trabalhados",
+      summary.daysWorked === null ? "Selecione um funcionário" : String(summary.daysWorked),
+    ],
     ["Atrasos", String(summary.late)],
     ["Horas totais", `${summary.totalHours.toFixed(1)}h`],
     ["Média por dia", `${summary.averageHours.toFixed(1)}h`],
