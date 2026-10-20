@@ -48,7 +48,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=sua-chave-publicavel
 
 Antes de liberar o registro de ponto, aplique a migration
 `20261013000000_add_dct_geofence.sql` no projeto Supabase. Ela configura o DCT nas coordenadas
-`-3.284848, -60.631474`, com raio inicial de 35 metros, e impede registros fora dessa área no banco.
+`-3.284848, -60.631474`, com raio de 15 metros, e impede registros fora dessa área no banco.
 
 As variáveis `VITE_*` ficam visíveis no navegador. Somente URL e chave publicável podem usar esse
 prefixo.

@@ -30,7 +30,7 @@ Teste pelo menos:
 - [ ] Solicitação de câmera e localização compreensível.
 - [ ] Check-out bloqueado antes do check-in.
 - [ ] Check-in com foto e localização.
-- [ ] Check-in permitido dentro da geocerca de 35 metros.
+- [ ] Check-in permitido dentro da geocerca de 15 metros.
 - [ ] Check-in rejeitado pelo banco fora da geocerca.
 - [ ] Precisão e distância da localização aparecem corretamente.
 - [ ] Localização com mais de dois minutos exige atualização antes do registro.
