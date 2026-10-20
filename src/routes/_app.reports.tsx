@@ -174,7 +174,8 @@ function ReportsPage() {
     });
 
     const totalHours = totalMs / 3_600_000;
-    const daysWorked = grouped.size;
+    const workdays = grouped.size;
+    const daysWorked = new Set(filtered.map((record) => dateKey(record.timestamp))).size;
     const chart = Array.from(hoursByDay.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([day, horas]) => ({
@@ -185,8 +186,8 @@ function ReportsPage() {
       daysWorked,
       late,
       totalHours,
-      average: daysWorked ? totalHours / daysWorked : 0,
-      overtime: Math.max(0, totalHours - daysWorked * 8),
+      average: workdays ? totalHours / workdays : 0,
+      overtime: Math.max(0, totalHours - workdays * 8),
       chart,
     };
   }, [filtered]);
