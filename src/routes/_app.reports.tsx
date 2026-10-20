@@ -17,10 +17,10 @@ import {
 } from "@/components/ui/select";
 import { StatCard } from "@/components/ui/stat-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useRecords } from "@/contexts/records-context";
 import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 import { calculateWorkedMilliseconds } from "@/lib/attendance";
+import type { CheckpointRecord } from "@/types";
 import {
   downloadAttendanceCsv,
   printAttendanceReport,
@@ -39,6 +39,17 @@ interface Employee {
   ativo: boolean;
 }
 
+interface AdminReportRow {
+  id: number;
+  colaborador_id: string;
+  colaborador_nome: string;
+  colaborador_equipe: string;
+  tipo: string;
+  data_hora: string;
+  latitude: number;
+  longitude: number;
+}
+
 const dateKey = (value: Date | string) => {
   const date = value instanceof Date ? value : new Date(value);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -46,7 +57,8 @@ const dateKey = (value: Date | string) => {
 
 function ReportsPage() {
   const { user } = useAuth();
-  const { records, loading } = useRecords();
+  const [records, setRecords] = useState<CheckpointRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [employee, setEmployee] = useState("all");
   const [team, setTeam] = useState("all");
@@ -63,6 +75,55 @@ function ReportsPage() {
         else setEmployees((data ?? []) as Employee[]);
       });
   }, []);
+
+  useEffect(() => {
+    if (user?.role !== "admin") {
+      setLoading(false);
+      return;
+    }
+
+    const fetchAllRecords = async () => {
+      setLoading(true);
+      try {
+        const rows: AdminReportRow[] = [];
+        const pageSize = 1000;
+        for (let offset = 0; ; offset += pageSize) {
+          const { data, error } = await supabase.rpc("relatorio_registros_admin", {
+            limite: pageSize,
+            deslocamento: offset,
+          });
+          if (error) throw error;
+          const page = (data ?? []) as AdminReportRow[];
+          rows.push(...page);
+          if (page.length < pageSize) break;
+        }
+
+        setRecords(
+          rows.map((row) => ({
+            id: String(row.id),
+            userId: row.colaborador_id,
+            userName: row.colaborador_nome,
+            userAvatar: "",
+            type: row.tipo === "CHECKOUT" ? "checkout" : "checkin",
+            timestamp: row.data_hora,
+            latitude: Number(row.latitude),
+            longitude: Number(row.longitude),
+            address: `Lat. ${Number(row.latitude).toFixed(5)}, Long. ${Number(row.longitude).toFixed(5)}`,
+            photo: "",
+            status: "on_time",
+          })),
+        );
+      } catch (error) {
+        console.error("Falha ao carregar registros administrativos:", error);
+        setRecords([]);
+        toast.error("Não foi possível carregar os registros de toda a equipe.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchAllRecords();
+  }, [user?.role]);
 
   const teams = useMemo(
     () => Array.from(new Set(employees.map((item) => item.equipe).filter(Boolean))) as string[],
@@ -177,6 +238,7 @@ function ReportsPage() {
       period,
       employee: selectedEmployee,
       team: selectedTeam,
+      generatedBy: user?.name ?? "Administrador",
       daysWorked: metrics.daysWorked,
       late: metrics.late,
       totalHours: metrics.totalHours,

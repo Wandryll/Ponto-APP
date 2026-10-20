@@ -52,6 +52,10 @@ Teste pelo menos:
 - [ ] Visualiza registros e fotos da equipe.
 - [ ] Exporta os registros filtrados em CSV e abre o arquivo no Excel.
 - [ ] Gera a versão de impressão e salva o relatório como PDF.
+- [ ] PDF contém as logos, identificação do DCT, filtros, responsável pela emissão e assinaturas.
+- [ ] Com os filtros em "Todos", o PDF contém registros de toda a equipe.
+- [ ] Selecionar outro funcionário apresenta os registros dele no relatório.
+- [ ] Usuário comum não consegue executar a consulta administrativa do relatório.
 - [ ] Exportação sem registros apresenta uma mensagem e não gera arquivo vazio.
 - [ ] Não recebe privilégios administrativos indevidos em contas comuns.
 
