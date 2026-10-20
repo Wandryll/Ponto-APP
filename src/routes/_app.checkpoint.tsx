@@ -8,16 +8,19 @@ import {
   Loader2,
   MapPin,
   RefreshCw,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { WebcamCapture } from "@/components/camera/webcam-capture";
 import { LocationMap } from "@/components/maps/location-map";
 import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 import { useRecords } from "@/contexts/records-context";
+import { calculateWorkedMilliseconds } from "@/lib/attendance";
 
 export const Route = createFileRoute("/_app/checkpoint")({
   head: () => ({ meta: [{ title: "Check-in / Check-out — Ponto DCT" }] }),
@@ -185,6 +188,15 @@ function CheckpointPage() {
       (record) => record.userId === user.id && new Date(record.timestamp).toDateString() === today,
     )
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+  const userRecords = records
+    .filter((record) => record.userId === user.id)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const todayUserRecords = userRecords.filter(
+    (record) => new Date(record.timestamp).toDateString() === today,
+  );
+  const workedTodayMs = calculateWorkedMilliseconds(todayUserRecords);
+  const workedTodayHours = Math.floor(workedTodayMs / 3_600_000);
+  const workedTodayMinutes = Math.floor((workedTodayMs % 3_600_000) / 60_000);
   const canCheckin = !latestToday || latestToday.type === "checkout";
   const canCheckout = latestToday?.type === "checkin";
   const distance =
@@ -304,6 +316,31 @@ function CheckpointPage() {
           Capture sua foto e confirme sua localização para registrar.
         </p>
       </div>
+
+      <Card
+        className={latestToday ? "border-success/30 bg-success/5" : "border-border bg-muted/20"}
+      >
+        <CardContent className="flex items-start gap-3 p-4 sm:p-5">
+          <CheckCircle2
+            className={`mt-0.5 h-5 w-5 shrink-0 ${latestToday ? "text-success" : "text-muted-foreground"}`}
+          />
+          <div>
+            <p className="font-semibold text-sm">
+              {latestToday ? "Última ação registrada" : "Nenhum registro realizado hoje"}
+            </p>
+            {latestToday && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {latestToday.type === "checkin" ? "Entrada" : "Saída"} registrada às{" "}
+                {new Date(latestToday.timestamp).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+                . Próxima ação: {latestToday.type === "checkin" ? "check-out" : "check-in"}.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
@@ -428,6 +465,57 @@ function CheckpointPage() {
             )}
             Registrar Check-out
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <History className="h-4 w-4 text-primary" /> Meus registros recentes
+          </CardTitle>
+          <div className="text-right">
+            <p className="text-xs text-muted-foreground">Total concluído hoje</p>
+            <p className="text-sm font-semibold tabular-nums">
+              {workedTodayHours}h {workedTodayMinutes.toString().padStart(2, "0")}min
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {userRecords.length ? (
+            <div className="divide-y divide-border">
+              {userRecords.slice(0, 10).map((record) => (
+                <div
+                  key={record.id}
+                  className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center"
+                >
+                  <div className="flex flex-1 items-center gap-3 min-w-0">
+                    <Badge variant={record.type === "checkin" ? "default" : "secondary"}>
+                      {record.type === "checkin" ? "Entrada" : "Saída"}
+                    </Badge>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium tabular-nums">
+                        {new Date(record.timestamp).toLocaleString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">{record.address}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {record.status === "late" ? "Registro com atraso" : "Registro confirmado"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              Você ainda não possui registros de ponto.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

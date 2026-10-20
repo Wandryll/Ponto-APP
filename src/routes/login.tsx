@@ -32,15 +32,15 @@ function LoginPage() {
   } = useForm<LoginForm>({ defaultValues: { email: "", password: "" } });
 
   useEffect(() => {
-    if (user) navigate({ to: "/dashboard" });
+    if (user) navigate({ to: user.role === "admin" ? "/dashboard" : "/checkpoint" });
   }, [user, navigate]);
 
   const onSubmit = async (data: LoginForm) => {
     setSubmitting(true);
     try {
-      await login(data.email.trim().toLowerCase(), data.password);
+      const loggedUser = await login(data.email.trim().toLowerCase(), data.password);
       toast.success("Login realizado com sucesso!");
-      navigate({ to: "/dashboard" });
+      navigate({ to: loggedUser.role === "admin" ? "/dashboard" : "/checkpoint" });
     } catch {
       toast.error("Não foi possível entrar.");
     } finally {

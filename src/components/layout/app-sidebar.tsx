@@ -9,7 +9,7 @@ const allItems = [
     to: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
-    roles: ["admin", "employee"],
+    roles: ["admin"],
   },
   {
     to: "/checkpoint",
@@ -21,7 +21,7 @@ const allItems = [
     to: "/history",
     label: "Histórico",
     icon: History,
-    roles: ["admin", "employee"],
+    roles: ["admin"],
   },
   { to: "/reports", label: "Relatórios", icon: BarChart3, roles: ["admin"] },
   { to: "/team", label: "Equipe", icon: Users, roles: ["admin"] },

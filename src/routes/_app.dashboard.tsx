@@ -39,12 +39,27 @@ function DashboardPage() {
     present: number;
     absent: number;
   } | null>(null);
+  const [recentActivity, setRecentActivity] = useState<
+    Array<{
+      id: string;
+      userName: string;
+      userTeam: string;
+      userAvatar: string;
+      type: "checkin" | "checkout";
+      timestamp: string;
+    }>
+  >([]);
+  const [activityError, setActivityError] = useState(false);
 
   useEffect(() => {
     const updateDashboard = async () => {
-      const { data, error } = await supabase.rpc("dashboard_resumo");
-      if (!error && data?.[0]) {
-        const summary = data[0] as {
+      const [summaryResult, activityResult] = await Promise.all([
+        supabase.rpc("dashboard_resumo"),
+        supabase.rpc("dashboard_atividade_recente", { limite: 6 }),
+      ]);
+
+      if (!summaryResult.error && summaryResult.data?.[0]) {
+        const summary = summaryResult.data[0] as {
           funcionarios_ativos: number;
           checkins_hoje: number;
           checkouts_hoje: number;
@@ -58,9 +73,34 @@ function DashboardPage() {
           present: Number(summary.presentes),
           absent: Number(summary.sem_checkin),
         });
-      } else if (error) {
-        console.error("Falha ao atualizar o resumo da equipe:", error);
       }
+
+      if (!activityResult.error) {
+        const activity = (activityResult.data ?? []) as Array<{
+          registro_id: number;
+          colaborador_nome: string;
+          colaborador_equipe: string;
+          colaborador_avatar: string;
+          tipo: string;
+          data_hora: string;
+        }>;
+        setRecentActivity(
+          activity.map((record) => ({
+            id: String(record.registro_id),
+            userName: record.colaborador_nome,
+            userTeam: record.colaborador_equipe,
+            userAvatar: record.colaborador_avatar,
+            type: record.tipo === "CHECKOUT" ? "checkout" : "checkin",
+            timestamp: record.data_hora,
+          })),
+        );
+      }
+
+      setActivityError(Boolean(activityResult.error));
+      if (summaryResult.error)
+        console.error("Falha ao atualizar o resumo da equipe:", summaryResult.error);
+      if (activityResult.error)
+        console.error("Falha ao atualizar a atividade da equipe:", activityResult.error);
 
       if (user?.role === "admin") await refresh();
     };
@@ -269,7 +309,7 @@ function DashboardPage() {
           <CardTitle>Atividade recente</CardTitle>
         </CardHeader>
         <CardContent className="divide-y divide-border">
-          {records.slice(0, 6).map((r) => (
+          {recentActivity.map((r) => (
             <div key={r.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
               <Avatar className="h-10 w-10 shrink-0">
                 <AvatarImage src={r.userAvatar} />
@@ -277,7 +317,7 @@ function DashboardPage() {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{r.userName}</p>
-                <p className="text-xs text-muted-foreground truncate">{r.address}</p>
+                <p className="text-xs text-muted-foreground truncate">{r.userTeam}</p>
               </div>
               <Badge variant={r.type === "checkin" ? "default" : "secondary"}>
                 {r.type === "checkin" ? "Check-in" : "Check-out"}
@@ -292,6 +332,16 @@ function DashboardPage() {
               </span>
             </div>
           ))}
+          {activityError && (
+            <p className="py-8 text-center text-sm text-destructive">
+              Não foi possível carregar a atividade geral da equipe.
+            </p>
+          )}
+          {!recentActivity.length && !activityError && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nenhuma atividade registrada.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

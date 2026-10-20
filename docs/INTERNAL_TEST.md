@@ -22,6 +22,11 @@ Teste pelo menos:
 ## Funcionário
 
 - [ ] Login correto e rejeição de senha inválida.
+- [ ] Após o login, acessa somente as telas de check-in/check-out e perfil.
+- [ ] Tentativas de abrir outras rotas redirecionam para o registro de ponto.
+- [ ] Última entrada ou saída do dia permanece visível com o horário e a próxima ação.
+- [ ] Histórico abaixo das ações mostra somente os próprios registros.
+- [ ] Total trabalhado no dia considera pares concluídos de entrada e saída.
 - [ ] Solicitação de câmera e localização compreensível.
 - [ ] Check-out bloqueado antes do check-in.
 - [ ] Check-in com foto e localização.
@@ -32,6 +37,7 @@ Teste pelo menos:
 - [ ] Novo check-in bloqueado até existir check-out.
 - [ ] Check-out registrado corretamente.
 - [ ] Dashboard em outro dispositivo atualiza os totais globais em até 30 segundos.
+- [ ] Atividade recente mostra registros gerais da equipe sem foto do ponto ou coordenadas.
 - [ ] Funcionário que fez check-out deixa de aparecer como presente.
 - [ ] Histórico mostra somente os próprios registros.
 - [ ] Foto privada não abre para outro funcionário.
