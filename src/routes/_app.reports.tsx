@@ -34,6 +34,7 @@ import {
   type EmployeeAttendanceReport,
 } from "@/lib/attendance-report";
 import {
+  buildFrequencyMirrorRows,
   exportGeneralPdf,
   exportGeneralXlsx,
   exportFrequencyMirrorPdf,
@@ -93,7 +94,7 @@ function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<ExportType | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [reportType, setReportType] = useState<ReportType>("general");
+  const [reportType, setReportType] = useState<ReportType>("frequency");
   const [periodType, setPeriodType] = useState<PeriodType>("monthly");
   const [employee, setEmployee] = useState("all");
   const [team, setTeam] = useState("all");
@@ -302,7 +303,7 @@ function ReportsPage() {
             ) : (
               <FileDown className="h-4 w-4" />
             )}
-            Exportar PDF
+            {reportType === "frequency" ? "Exportar Espelho PDF" : "Exportar PDF"}
           </Button>
           <Button
             variant="outline"
@@ -335,9 +336,9 @@ function ReportsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="frequency">Espelho de Frequência — DCT</SelectItem>
                 <SelectItem value="general">Relatório Geral — SEMEC</SelectItem>
                 <SelectItem value="individual">Espelho de Ponto Individual</SelectItem>
-                <SelectItem value="frequency">Espelho de Frequência — DCT</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -411,12 +412,73 @@ function ReportsPage() {
         </CardContent>
       </Card>
 
-      {reportType === "general" || reportType === "frequency" ? (
+      {reportType === "frequency" ? (
+        <FrequencyPreview reports={reports} loading={loading} />
+      ) : reportType === "general" ? (
         <GeneralPreview reports={reports} totals={totals} loading={loading} />
       ) : (
         <IndividualPreview report={individualReport} loading={loading} />
       )}
     </div>
+  );
+}
+
+function FrequencyPreview({
+  reports,
+  loading,
+}: {
+  reports: EmployeeAttendanceReport[];
+  loading: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Prévia do Espelho de Frequência — DCT</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Carregando registros...</p>
+        ) : (
+          reports.map((report) => {
+            const rows = buildFrequencyMirrorRows(report);
+
+            return (
+              <section key={report.id} className="space-y-3">
+                <h3 className="font-semibold text-foreground">{report.name}</h3>
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full min-w-[480px] text-sm">
+                    <thead className="bg-primary text-primary-foreground">
+                      <tr>
+                        <th className="px-4 py-3 text-center">Data</th>
+                        <th className="px-4 py-3 text-center">Entrada</th>
+                        <th className="px-4 py-3 text-center">Saída</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.length ? (
+                        rows.map((row, index) => (
+                          <tr key={`${report.id}-${index}`} className="border-t even:bg-muted/40">
+                            <td className="px-4 py-3 text-center">{row[0]}</td>
+                            <td className="px-4 py-3 text-center">{row[1]}</td>
+                            <td className="px-4 py-3 text-center">{row[2]}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr className="border-t">
+                          <td className="px-4 py-4 text-center text-muted-foreground" colSpan={3}>
+                            Nenhum registro no período
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            );
+          })
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

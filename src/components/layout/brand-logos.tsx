@@ -13,26 +13,26 @@ export function BrandLogos({ className, compact = false }: BrandLogosProps) {
     >
       <div
         className={cn(
-          "overflow-hidden rounded-lg border border-white/15 bg-black shadow-sm",
+          "overflow-hidden rounded-lg border border-white/15 bg-transparent shadow-sm",
           compact ? "h-10 w-10" : "h-16 w-16 sm:h-20 sm:w-20",
         )}
       >
         <img
-          src="/logo-01.jpeg"
+          src="/logo-01-transparent.png"
           alt="Departamento de Ciências e Tecnologia"
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
         />
       </div>
       <div
         className={cn(
-          "overflow-hidden rounded-lg border border-white/15 bg-black shadow-sm",
+          "overflow-hidden rounded-lg border border-white/15 bg-transparent shadow-sm",
           compact ? "h-10 w-[6.25rem]" : "h-16 w-40 sm:h-20 sm:w-52",
         )}
       >
         <img
-          src="/logo-02.jpeg"
+          src="/logo-02-transparent.png"
           alt="Prefeitura de Manacapuru"
-          className="h-full w-full object-cover object-[center_18%]"
+          className="h-full w-full object-contain"
         />
       </div>
     </div>
