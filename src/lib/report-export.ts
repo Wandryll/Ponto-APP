@@ -5,6 +5,7 @@ import {
   formatDuration,
   formatReportDate,
   formatReportTime,
+  reportDateKey,
   type AttendanceDay,
   type EmployeeAttendanceReport,
 } from "@/lib/attendance-report";
@@ -41,8 +42,8 @@ async function imageData(path: string) {
 
 async function loadLogos() {
   const results = await Promise.allSettled([
-    imageData("/logo-01.jpeg"),
-    imageData("/logo-02.jpeg"),
+    imageData("/logo-01-transparent.png"),
+    imageData("/logo-02-transparent.png"),
   ]);
   return {
     dct: results[0].status === "fulfilled" ? results[0].value : null,
@@ -57,8 +58,8 @@ function addInstitutionalHeader(
   logos: Awaited<ReturnType<typeof loadLogos>>,
 ) {
   const pageWidth = doc.internal.pageSize.getWidth();
-  if (logos.dct) doc.addImage(logos.dct, "JPEG", 14, 9, 20, 20);
-  if (logos.city) doc.addImage(logos.city, "JPEG", pageWidth - 48, 9, 34, 18);
+  if (logos.dct) doc.addImage(logos.dct, "PNG", 14, 9, 20, 20);
+  if (logos.city) doc.addImage(logos.city, "PNG", pageWidth - 48, 9, 34, 18);
   doc.setTextColor(...COLORS.navy);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -247,6 +248,156 @@ export async function exportIndividualPdf(
   }
   addSignatures(doc, "Assinatura do Funcionário", "Assinatura do Responsável", finalY);
   addPageNumbers(doc);
+  doc.save(filename);
+}
+
+export function buildFrequencyMirrorRows(report: EmployeeAttendanceReport) {
+  return report.days.flatMap((day) =>
+    day.intervals.map((interval) => [
+      day.date.split("-").reverse().join("/"),
+      interval.checkin ? formatReportTime(interval.checkin.timestamp) : "—",
+      interval.checkout ? formatReportTime(interval.checkout.timestamp) : "—",
+    ]),
+  );
+}
+
+function addFrequencyMirrorHeader(
+  doc: jsPDF,
+  report: EmployeeAttendanceReport,
+  metadata: ReportMetadata,
+  logos: Awaited<ReturnType<typeof loadLogos>>,
+) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  if (logos.dct) doc.addImage(logos.dct, "PNG", 14, 9, 20, 20);
+  if (logos.city) doc.addImage(logos.city, "PNG", pageWidth - 48, 9, 34, 18);
+  doc.setTextColor(...COLORS.navy);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("PREFEITURA MUNICIPAL DE MANACAPURU", pageWidth / 2, 12, { align: "center" });
+  doc.setFontSize(8);
+  doc.text("SECRETARIA MUNICIPAL DE EDUCAÇÃO — SEMEC", pageWidth / 2, 17, {
+    align: "center",
+  });
+  doc.text("DEPARTAMENTO DE CIÊNCIAS E TECNOLOGIA — DCT", pageWidth / 2, 22, {
+    align: "center",
+  });
+  doc.setDrawColor(...COLORS.gold);
+  doc.setLineWidth(0.7);
+  doc.line(14, 32, pageWidth - 14, 32);
+  doc.setTextColor(...COLORS.green);
+  doc.setFontSize(14);
+  doc.text("ESPELHO DE FREQUÊNCIA", pageWidth / 2, 42, { align: "center" });
+  doc.setTextColor(105, 113, 109);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text(
+    `${frequencyReference(metadata.start, metadata.end)}  •  Emissão: ${formatReportDate(new Date())}`,
+    pageWidth / 2,
+    49,
+    { align: "center" },
+  );
+  const accrualDate = frequencyAccrualDate(metadata.end);
+  if (accrualDate) {
+    doc.setFontSize(7.5);
+    doc.text(`Registros apurados até: ${accrualDate}`, pageWidth / 2, 53, {
+      align: "center",
+    });
+  }
+  doc.setFillColor(...COLORS.light);
+  doc.roundedRect(14, 58, pageWidth - 28, 15, 2, 2, "F");
+  doc.setTextColor(...COLORS.navy);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 110, 105);
+  doc.text("FUNCIONÁRIO", 19, 63);
+  doc.setTextColor(...COLORS.navy);
+  doc.setFontSize(10);
+  doc.text(report.name.toUpperCase(), 19, 70);
+}
+
+export function frequencyAccrualDate(end: string, now: Date = new Date()) {
+  const today = reportDateKey(now);
+  return end > today ? formatReportDate(`${today}T12:00:00Z`) : null;
+}
+
+function frequencyReference(start: string, end: string) {
+  if (start.slice(0, 7) === end.slice(0, 7)) {
+    const month = new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Manaus",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(`${start}T12:00:00Z`));
+    return `Referência: ${month}`;
+  }
+  return `Período: ${formatReportDate(`${start}T12:00:00Z`)} a ${formatReportDate(`${end}T12:00:00Z`)}`;
+}
+
+function addFrequencyMirrorFooters(doc: jsPDF) {
+  const pages = doc.getNumberOfPages();
+  const width = doc.internal.pageSize.getWidth();
+  const height = doc.internal.pageSize.getHeight();
+  for (let page = 1; page <= pages; page += 1) {
+    doc.setPage(page);
+    doc.setDrawColor(...COLORS.gold);
+    doc.setLineWidth(0.25);
+    doc.line(14, height - 15, width - 14, height - 15);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(105, 113, 109);
+    doc.text("DCT | Ponto APP", 14, height - 10);
+    doc.text(`Página ${page} de ${pages}`, width - 14, height - 10, { align: "right" });
+  }
+}
+
+export async function exportFrequencyMirrorPdf(
+  reports: EmployeeAttendanceReport[],
+  metadata: ReportMetadata,
+  filename: string,
+) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const logos = await loadLogos();
+  let pageCreated = false;
+
+  reports.forEach((report) => {
+    const rows = buildFrequencyMirrorRows(report);
+    const displayRows = rows.length ? rows : [["Nenhum registro no período", "—", "—"]];
+    const pages = Array.from({ length: Math.ceil(displayRows.length / 20) }, (_, index) =>
+      displayRows.slice(index * 20, index * 20 + 20),
+    );
+
+    pages.forEach((pageRows) => {
+      if (pageCreated) doc.addPage();
+      pageCreated = true;
+      addFrequencyMirrorHeader(doc, report, metadata, logos);
+      autoTable(doc, {
+        startY: 80,
+        margin: { right: 14, bottom: 22, left: 14 },
+        head: [["Data", "Entrada", "Saída"]],
+        body: pageRows,
+        theme: "grid",
+        styles: {
+          fontSize: 9,
+          cellPadding: 2.5,
+          textColor: COLORS.navy,
+          valign: "middle",
+        },
+        headStyles: {
+          fillColor: COLORS.green,
+          textColor: 255,
+          fontStyle: "bold",
+          halign: "center",
+        },
+        alternateRowStyles: { fillColor: COLORS.light },
+        columnStyles: {
+          0: { cellWidth: 72, halign: "center" },
+          1: { cellWidth: 55, halign: "center" },
+          2: { cellWidth: 55, halign: "center" },
+        },
+      });
+    });
+  });
+
+  addFrequencyMirrorFooters(doc);
   doc.save(filename);
 }
 

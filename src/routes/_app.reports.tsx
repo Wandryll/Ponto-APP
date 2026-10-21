@@ -36,6 +36,7 @@ import {
 import {
   exportGeneralPdf,
   exportGeneralXlsx,
+  exportFrequencyMirrorPdf,
   exportIndividualPdf,
   exportIndividualXlsx,
   type ReportMetadata,
@@ -66,7 +67,7 @@ interface AdminReportRow {
   longitude: number;
 }
 
-type ReportType = "general" | "individual";
+type ReportType = "general" | "individual" | "frequency";
 type PeriodType = "weekly" | "biweekly" | "monthly" | "custom";
 type ExportType = "pdf" | "xlsx";
 
@@ -250,6 +251,19 @@ function ReportsPage() {
         const filename = `Relatorio_Geral_DCT_${reference}.${format === "pdf" ? "pdf" : "xlsx"}`;
         if (format === "pdf") await exportGeneralPdf(reports, metadata, filename);
         else await exportGeneralXlsx(reports, metadata, filename);
+      } else if (reportType === "frequency") {
+        const monthlyReference = start.slice(0, 7) === end.slice(0, 7);
+        const reference = monthlyReference ? start.slice(0, 7) : `${start}_${end}`;
+        const selected = employee === "all" ? "DCT" : fileSafeName(reports[0]?.name ?? "DCT");
+        const filename =
+          employee === "all"
+            ? `Espelho_Frequencia_DCT_${reference}.pdf`
+            : `Espelho_Frequencia_${selected}_${reference}.pdf`;
+        if (format !== "pdf") {
+          toast.info("O Espelho de Frequência DCT está disponível somente em PDF.");
+          return;
+        }
+        await exportFrequencyMirrorPdf(reports, metadata, filename);
       } else if (individualReport) {
         const name = fileSafeName(individualReport.name);
         const filename = `Espelho_Ponto_${name}_${reference}.${format === "pdf" ? "pdf" : "xlsx"}`;
@@ -293,7 +307,7 @@ function ReportsPage() {
           <Button
             variant="outline"
             className="gap-2"
-            disabled={exporting !== null}
+            disabled={exporting !== null || reportType === "frequency"}
             onClick={() => void handleExport("xlsx")}
           >
             {exporting === "xlsx" ? (
@@ -323,6 +337,7 @@ function ReportsPage() {
               <SelectContent>
                 <SelectItem value="general">Relatório Geral — SEMEC</SelectItem>
                 <SelectItem value="individual">Espelho de Ponto Individual</SelectItem>
+                <SelectItem value="frequency">Espelho de Frequência — DCT</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -351,7 +366,7 @@ function ReportsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" disabled={reportType === "individual"}>
-                  {reportType === "general" ? "Todos" : "Selecione um funcionário"}
+                  {reportType === "individual" ? "Selecione um funcionário" : "Todos"}
                 </SelectItem>
                 {activeEmployees.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
@@ -396,7 +411,7 @@ function ReportsPage() {
         </CardContent>
       </Card>
 
-      {reportType === "general" ? (
+      {reportType === "general" || reportType === "frequency" ? (
         <GeneralPreview reports={reports} totals={totals} loading={loading} />
       ) : (
         <IndividualPreview report={individualReport} loading={loading} />
