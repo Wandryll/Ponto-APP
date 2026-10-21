@@ -20,7 +20,8 @@ import { LocationMap } from "@/components/maps/location-map";
 import { useAuth } from "@/contexts/auth-context";
 import { supabase } from "@/lib/supabaseClient";
 import { useRecords } from "@/contexts/records-context";
-import { calculateWorkedMilliseconds } from "@/lib/attendance";
+import { calculateWorkedMilliseconds, dailyCheckpointState } from "@/lib/attendance";
+import { reportDateKey, REPORT_TIME_ZONE } from "@/lib/attendance-report";
 
 export const Route = createFileRoute("/_app/checkpoint")({
   head: () => ({ meta: [{ title: "Check-in / Check-out — Ponto DCT" }] }),
@@ -182,23 +183,21 @@ function CheckpointPage() {
 
   if (!user) return null;
 
-  const today = new Date().toDateString();
-  const latestToday = records
-    .filter(
-      (record) => record.userId === user.id && new Date(record.timestamp).toDateString() === today,
-    )
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+  const today = reportDateKey(new Date(currentTime));
+  const {
+    latest: latestToday,
+    canCheckin,
+    canCheckout,
+  } = dailyCheckpointState(records, user.id, new Date(currentTime));
   const userRecords = records
     .filter((record) => record.userId === user.id)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   const todayUserRecords = userRecords.filter(
-    (record) => new Date(record.timestamp).toDateString() === today,
+    (record) => reportDateKey(record.timestamp) === today,
   );
   const workedTodayMs = calculateWorkedMilliseconds(todayUserRecords);
   const workedTodayHours = Math.floor(workedTodayMs / 3_600_000);
   const workedTodayMinutes = Math.floor((workedTodayMs % 3_600_000) / 60_000);
-  const canCheckin = !latestToday || latestToday.type === "checkout";
-  const canCheckout = latestToday?.type === "checkin";
   const distance =
     coords && workLocation
       ? distanceInMeters(coords.lat, coords.lng, workLocation.latitude, workLocation.longitude)
@@ -334,6 +333,7 @@ function CheckpointPage() {
                 {new Date(latestToday.timestamp).toLocaleTimeString("pt-BR", {
                   hour: "2-digit",
                   minute: "2-digit",
+                  timeZone: REPORT_TIME_ZONE,
                 })}
                 . Próxima ação: {latestToday.type === "checkin" ? "check-out" : "check-in"}.
               </p>
@@ -500,6 +500,7 @@ function CheckpointPage() {
                           year: "numeric",
                           hour: "2-digit",
                           minute: "2-digit",
+                          timeZone: REPORT_TIME_ZONE,
                         })}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">{record.address}</p>
